@@ -1,3 +1,4 @@
+-- custmors_EDA
 -- 고객별 주문횟수, 결제횟수, 총 주문금액, 평균 객단가
 SELECT 
     c.customer_unique_id,
@@ -13,7 +14,7 @@ GROUP BY c.customer_unique_id
 ORDER BY order_count DESC
 limit 10;
 
-
+-- orders_EDA
 -- order_status가'canceled','unavailable' 인 상태에서 수령한 경우
 select c.customer_unique_id,o.order_purchase_timestamp,o.order_delivered_customer_date
 from orders o
@@ -23,5 +24,15 @@ group by order_purchase_timestamp,order_delivered_customer_date,customer_unique_
 order by order_delivered_customer_date desc
 limit 10;
 
-
-
+-- 구매 승인이 지난 후 주문 취소
+SELECT 
+    c.customer_unique_id,
+    o.order_approved_at,
+    o.order_status,
+    COUNT(*) AS canceled_order_count
+FROM customers c
+JOIN orders o ON c.customer_id = o.customer_id
+WHERE o.order_status = 'canceled' AND o.order_approved_at is not null
+GROUP BY c.customer_unique_id, o.order_approved_at, o.order_status
+ORDER BY canceled_order_count DESC
+limit 10;

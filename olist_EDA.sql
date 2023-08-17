@@ -48,67 +48,67 @@ order by month;
 
 -- products_EDA
 -- 제품 카테고리별 매출액 
-SELECT p.product_category_name, 
+SELECT p.product_category_name_english,
 	round(SUM(payment_value),2)as revenue
-FROM products p
+FROM products_new p
 JOIN order_items oi ON p.product_id = oi.product_id
 JOIN orders o ON oi.order_id = o.order_id
 JOIN order_payments op ON oi.order_id = op.order_id
 WHERE order_status not in ('canceled','unavailable')
 AND order_delivered_customer_date IS NOT NULL
-GROUP BY p.product_category_name
+GROUP BY p.product_category_name_english
 ORDER BY revenue DESC
 limit 10;
 
 -- 제품 카테고리별 판매 개수 계산
-SELECT product_category_name, sales_count,
+SELECT product_category_name_english, sales_count,
        ROUND(sales_count / total_sales * 100, 3) AS sales_ratio
 FROM (
-    SELECT p.product_category_name, COUNT(*) AS sales_count,
+    SELECT p.product_category_name_english, COUNT(*) AS sales_count,
            SUM(COUNT(*)) OVER () AS total_sales 
     FROM order_items oi
-    JOIN products p ON oi.product_id = p.product_id
+    JOIN products_new p ON oi.product_id = p.product_id
     JOIN orders o ON oi.order_id = o.order_id
     WHERE o.order_status not in ('cancled','unavailable')
-    GROUP BY p.product_category_name
+    GROUP BY p.product_category_name_english
 ) AS category_sales
 order by sales_count desc
 limit 10;
 
 -- 매출에 따른 카테고리 제품 상위 10 / 하위 10
 -- 2016~2018 까지의 상위 10
-SELECT t1.product_category_name,
+SELECT t1.product_category_name_english,
        COUNT(DISTINCT t1.order_id) as Order_cnt,
        ROUND(SUM(t1.payment_value),2) as Revenue
 FROM (
-    SELECT p.product_category_name, oi.order_id, op.payment_value, o.order_status, o.order_delivered_customer_date
-    FROM products p
+    SELECT p.product_category_name_english, oi.order_id, op.payment_value, o.order_status, o.order_delivered_customer_date
+    FROM products_new p
     LEFT JOIN order_items oi ON p.product_id = oi.product_id
     LEFT JOIN orders o ON oi.order_id = o.order_id
     LEFT JOIN order_payments op ON oi.order_id = op.order_id
 ) t1
-WHERE t1.product_category_name IS NOT NULL
+WHERE t1.product_category_name_english IS NOT NULL
       AND t1.order_status not in ('canceled', 'unavailable')
       AND t1.order_delivered_customer_date IS NOT NULL
-GROUP BY t1.product_category_name
+GROUP BY t1.product_category_name_english
 ORDER BY Revenue DESC
 LIMIT 10;
 
 -- 2016~2018 까지의 하위 10
-SELECT t1.product_category_name,
+SELECT t1.product_category_name_english,
        COUNT(DISTINCT t1.order_id) as Order_cnt,
        ROUND(SUM(t1.payment_value),2) as Revenue
 FROM (
-    SELECT p.product_category_name, oi.order_id, op.payment_value, o.order_status, o.order_delivered_customer_date
-    FROM products p
+    SELECT p.product_category_name_english, oi.order_id, op.payment_value, o.order_status, o.order_delivered_customer_date
+    FROM products_new p
     LEFT JOIN order_items oi ON p.product_id = oi.product_id
     LEFT JOIN orders o ON oi.order_id = o.order_id
     LEFT JOIN order_payments op ON oi.order_id = op.order_id
 ) t1
-WHERE t1.product_category_name IS NOT NULL
+WHERE t1.product_category_name_english IS NOT NULL
       AND t1.order_status not in ('canceled', 'unavailable')
       AND t1.order_delivered_customer_date IS NOT NULL
-GROUP BY t1.product_category_name
+GROUP BY t1.product_category_name_english
 ORDER BY Revenue ASC
 LIMIT 10;
 
@@ -132,7 +132,7 @@ SELECT yearmonth, r_score, all_cnt,
 -- 카테고리 제품 성장률
 WITH Category_revenue AS (
     SELECT
-        p.product_category_name AS cat_name,
+        p.product_category_name_english AS cat_name,
         op.payment_value,
         CASE
             WHEN DATE_FORMAT(o.order_purchase_timestamp, '%Y') = '2017' THEN '2017'
@@ -141,12 +141,13 @@ WITH Category_revenue AS (
     FROM order_payments op
     LEFT JOIN orders o ON op.order_id = o.order_id
     LEFT JOIN order_items oi ON op.order_id = oi.order_id
-    LEFT JOIN products p ON oi.product_id = p.product_id
+    LEFT JOIN products_new p ON oi.product_id = p.product_id
     WHERE o.order_status NOT IN ('canceled', 'unavailable')
         AND (DATE_FORMAT(o.order_purchase_timestamp, '%Y') = '2017'
                OR DATE_FORMAT(o.order_purchase_timestamp, '%Y') = '2018')
-    GROUP BY p.product_category_name, op.payment_value, purchase_fiscal
+    GROUP BY p.product_category_name_english, op.payment_value, purchase_fiscal
 )
+
 SELECT cat_name,
        SUM(CASE WHEN purchase_fiscal = '2017' THEN payment_value END) AS '2017',
        SUM(CASE WHEN purchase_fiscal = '2018' THEN payment_value END) AS '2018',

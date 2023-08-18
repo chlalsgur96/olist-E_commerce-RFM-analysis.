@@ -70,4 +70,62 @@ FROM (
 	GROUP BY     customer_unique_id
     ) T1
 	ORDER BY     F
+;
+
+ R: 고객 별 최근 구매 활동
+SELECT
+    c.customer_unique_id,
+    MAX(o.order_purchase_timestamp) AS last_purchase_date,
+    DATEDIFF('2018-09-03', MAX(o.order_purchase_timestamp)) AS recency,
+    RANK() OVER(ORDER BY DATEDIFF('2018-09-03', MAX(o.order_purchase_timestamp))) AS recency_rank
+FROM
+    customers c
+JOIN
+    orders o ON c.customer_id = o.customer_id
+WHERE
+    o.order_status NOT IN ('canceled', 'unavailable')
+GROUP BY
+    c.customer_unique_id
+ORDER BY
+    recency_rank;
+
+-- F : 고객 구매 빈도
+SELECT
+    c.customer_unique_id,
+    COUNT(DISTINCT o.order_id) AS F,
+    ROUND(CUME_DIST() OVER(ORDER BY COUNT(DISTINCT o.order_id)), 2) AS F_ratio
+FROM
+    customers c
+JOIN
+    orders o ON c.customer_id = o.customer_id
+LEFT JOIN
+    order_payments op ON o.order_id = op.order_id
+WHERE
+    o.order_status NOT IN ('canceled', 'unavailable')
+    AND op.payment_type IS NOT NULL
+GROUP BY
+    c.customer_unique_id
+ORDER BY
+    F_ratio DESC;
+
+--  F 고객 구매 빈도를 그룹화
+SELECT
+	CASE WHEN F = 1 THEN 'F1'
+		 WHEN F = 2 THEN 'F2'
+         WHEN F = 3 THEN 'F3'
+         ELSE 'F4'
+	END AS F_group,
+    COUNT(*) AS cus_cnt,
+    COUNT(*) / SUM(COUNT(*)) OVER() AS portion
+FROM (
+	SELECT customer_unique_id,
+		COUNT(DISTINCT order_id) AS F
+    FROM
+		orders o
+        JOIN customers c
+        ON o.customer_id = c.customer_id
+	WHERE o.order_status NOT IN ('canceled','unavailable')
+    GROUP BY customer_unique_id
+    ) AS t
+    GROUP BY F_group;
         

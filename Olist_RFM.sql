@@ -89,6 +89,26 @@ GROUP BY
 ORDER BY
     recency_rank;
 
+-- R 분포
+SELECT
+    recency_rank AS R_group,
+    COUNT(*) AS count,
+    COUNT(*) / SUM(COUNT(*)) OVER() AS portion
+FROM (
+    SELECT
+        RANK() OVER(ORDER BY DATEDIFF('2018-09-03', MAX(o.order_purchase_timestamp))) AS recency_rank
+    FROM
+        customers c
+    JOIN
+        orders o ON c.customer_id = o.customer_id
+    WHERE
+        o.order_status NOT IN ('canceled', 'unavailable')
+    GROUP BY
+        c.customer_unique_id
+) AS R_data
+GROUP BY recency_rank
+ORDER BY recency_rank;
+
 -- F : 고객 구매 빈도
 SELECT
     c.customer_unique_id,
@@ -128,4 +148,27 @@ FROM (
     GROUP BY customer_unique_id
     ) AS t
     GROUP BY F_group;
-        
+
+-- M :고객 별 구매 금액 사분위수
+WITH S AS (
+    SELECT
+        c.customer_unique_id,
+        ROUND(SUM(op.payment_value), 2) AS payment_value,
+        PERCENT_RANK() OVER (ORDER BY ROUND(SUM(op.payment_value), 2)) AS M_rk
+    FROM
+        orders o
+        LEFT JOIN customers c ON o.customer_id = c.customer_id
+        LEFT JOIN order_payments op ON o.order_id = op.order_id
+    WHERE
+        o.order_status NOT IN ('canceled', 'unavailable')
+        AND op.payment_type IS NOT NULL
+    GROUP BY
+        c.customer_unique_id
+)
+SELECT 
+    MIN(payment_value) AS min,
+    MAX(CASE WHEN M_rk <= 0.25 THEN payment_value END) AS q1,
+    MAX(CASE WHEN M_rk <= 0.5 THEN payment_value END) AS q2,
+    MAX(CASE WHEN M_rk <= 0.75 THEN payment_value END) AS q3,
+    MAX(payment_value) AS max
+FROM S;

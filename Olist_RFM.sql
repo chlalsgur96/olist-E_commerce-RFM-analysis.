@@ -172,3 +172,49 @@ SELECT
     MAX(CASE WHEN M_rk <= 0.75 THEN payment_value END) AS q3,
     MAX(payment_value) AS max
 FROM S;
+
+
+-- RFM SCORE VW
+CREATE VIEW RFM_vw AS
+WITH RFM_base AS (
+    SELECT 
+        customer_unique_id,
+        MAX(order_purchase_timestamp) AS R,
+        TIMESTAMPDIFF(DAY, MAX(order_purchase_timestamp), '2018-09-03') AS R_days,
+        COUNT(DISTINCT o.order_id) AS F,
+        SUM(payment_value) AS M
+    FROM orders o
+    LEFT JOIN customers c ON o.customer_id = c.customer_id
+    LEFT JOIN order_payments p ON o.order_id = p.order_id
+    WHERE o.order_status NOT IN ('canceled', 'unavailable') AND payment_value IS NOT NULL
+    GROUP BY customer_unique_id
+)
+SELECT 
+    customer_unique_id,
+    R,
+    R_days,
+    F,
+    M,
+    CASE 
+        WHEN R_days < 120 THEN '5'
+        WHEN R_days < 240 THEN '4'
+        WHEN R_days < 360 THEN '3'
+        WHEN R_days < 480 THEN '2'
+        ELSE '1'
+    END AS R_score,
+    CASE 
+        WHEN F = 1 THEN '1'
+        WHEN F = 2 THEN '2'
+        WHEN F = 3 THEN '3'
+        WHEN F = 4 THEN '4'
+        ELSE '5'
+    END AS F_score,
+    CASE 
+        WHEN M < 65 THEN '1'
+        WHEN M < 65 * 2 THEN '2'
+        WHEN M < 65 * 3 THEN '3'
+        WHEN M < 65 * 4 THEN '4'
+        ELSE '5'
+    END AS M_score
+FROM RFM_base;
+

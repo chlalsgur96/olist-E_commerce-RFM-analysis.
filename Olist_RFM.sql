@@ -196,7 +196,6 @@ SELECT
     F,
     M,
     CASE 
-        WHEN R_days < 120 THEN '5'
         WHEN R_days < 240 THEN '4'
         WHEN R_days < 360 THEN '3'
         WHEN R_days < 480 THEN '2'
@@ -206,15 +205,102 @@ SELECT
         WHEN F = 1 THEN '1'
         WHEN F = 2 THEN '2'
         WHEN F = 3 THEN '3'
-        WHEN F = 4 THEN '4'
-        ELSE '5'
+        ELSE '4'
     END AS F_score,
     CASE 
         WHEN M < 65 THEN '1'
         WHEN M < 65 * 2 THEN '2'
         WHEN M < 65 * 3 THEN '3'
-        WHEN M < 65 * 4 THEN '4'
-        ELSE '5'
+        ELSE ''
     END AS M_score
 FROM RFM_base;
+
+-- RFM 지표별 매출 기여 효과
+-- R_score
+SELECT R_score , COUNT(*) R_CNT,
+			COUNT(*)/SUM(COUNT(*)) OVER() AS R_raion,
+            ROUND(SUM(M),2) AS R_revenue,
+			ROUND(sum(m) / sum(sum(m)) over(), 2) AS revenue_contributing,
+            ROUND((sum(m) / sum(sum(m)) over()) / (count(*) / sum(count(*)) over()), 3) AS contributing_effect
+FROM rfm_vw
+GROUP BY R_score
+ORDER BY R_score;
+
+SELECT SUM(contributing_effect) AS R_contributing_effect
+FROM(
+SELECT R_score , COUNT(*) R_CNT,
+			COUNT(*)/SUM(COUNT(*)) OVER() AS R_raion,
+            ROUND(SUM(M),2) AS R_revenue,
+			ROUND(sum(m) / sum(sum(m)) over(), 2) AS revenue_contributing,
+            ROUND((sum(m) / sum(sum(m)) over()) / (count(*) / sum(count(*)) over()), 3) AS contributing_effect
+FROM rfm_vw
+GROUP BY R_score
+ORDER BY 1) as r1;
+
+-- F_score
+SELECT F_score, count(*) CNT, 
+		count(*) / sum(count(*)) over() AS user_ratio,
+		ROUND(sum(m), 2) AS revenue,
+		ROUND(sum(m) / sum(sum(m)) over(), 2) AS revenue_contributing,
+        ROUND((sum(m) / sum(sum(m)) over()) / (count(*) / sum(count(*)) over()), 3) AS contributing_effect
+FROM rfm_vw
+group by F_score;
+
+SELECT SUM(contributing_effect) AS F_contributing_effect
+FROM(
+SELECT F_score , COUNT(*) F_CNT,
+			COUNT(*)/SUM(COUNT(*)) OVER() AS F_raion,
+            ROUND(SUM(M),2) AS R_revenue,
+            ROUND(sum(m) / sum(sum(m)) over(), 2) AS revenue_contributing,
+            ROUND((sum(m) / sum(sum(m)) over()) / (count(*) / sum(count(*)) over()), 3) AS contributing_effect
+FROM rfm_vw
+GROUP BY F_score
+) F1;
+
+-- M_score
+SELECT M_score, count(*) CNT, 
+		count(*) / sum(count(*)) over() AS user_ratio,
+		ROUND(sum(m), 2) AS revenue,
+		ROUND(sum(m) / sum(sum(m)) over(), 2) AS revenue_contributing,
+        ROUND((sum(m) / sum(sum(m)) over()) / (count(*) / sum(count(*)) over()), 3) AS contributing_effect
+FROM rfm_vw
+GROUP BY M_score
+ORDER BY M_score;
+
+SELECT SUM(contributing_effect) AS M_contributing_effect
+FROM(
+SELECT M_score, count(*) CNT, 
+		count(*) / sum(count(*)) over() AS user_ratio,
+		ROUND(sum(m), 2) AS revenue,
+		ROUND(sum(m) / sum(sum(m)) over(), 2) AS revenue_contributing,
+        ROUND((sum(m) / sum(sum(m)) over()) / (count(*) / sum(count(*)) over()), 3) AS contributing_effect
+FROM rfm_vw
+GROUP BY M_score
+ORDER BY M_score
+) M1;
+
+-- RFM 모형 탐색
+-- 가중치 (1,1,1)
+SELECT (R_score + F_score + M_score) AS total_score,
+       R_score, F_score, M_score,
+       COUNT(*) AS cnt,
+       COUNT(*) / (SELECT COUNT(*) FROM rfm_vw) AS ratio
+FROM rfm_vw
+GROUP BY total_score, R_score, F_score, M_score
+ORDER BY total_score DESC, R_score DESC, F_score DESC, M_score DESC;
+
+
+-- 매출 기여 효과 비중을 가중치로 산정
+WITH S AS (
+SELECT
+	(SELECT SUM(R_contributing_effect) FROM r_vw) AS total_R_contribution,
+	(SELECT SUM(F_contributing_effect) FROM f_vw) AS total_F_contribution,
+	(SELECT SUM(M_contributing_effect) FROM m_vw) AS total_M_contribution)
+SELECT ROUND(total_R_contribution / (total_R_contribution + total_F_contribution + total_M_contribution), 2) AS R_weight,
+			 ROUND(total_F_contribution / (total_R_contribution + total_F_contribution + total_M_contribution), 2) AS F_weight,
+			 ROUND(total_M_contribution / (total_R_contribution + total_F_contribution + total_M_contribution), 2) AS M_weight
+FROM S;
+
+
+
 

@@ -196,9 +196,9 @@ SELECT
     F,
     M,
     CASE 
-        WHEN R_days < 240 THEN '4'
-        WHEN R_days < 360 THEN '3'
-        WHEN R_days < 480 THEN '2'
+        WHEN R_days < 120 THEN '4'
+        WHEN R_days < 240 THEN '3'
+        WHEN R_days < 360 THEN '2'
         ELSE '1'
     END AS R_score,
     CASE 
@@ -301,6 +301,25 @@ SELECT ROUND(total_R_contribution / (total_R_contribution + total_F_contribution
 			 ROUND(total_M_contribution / (total_R_contribution + total_F_contribution + total_M_contribution), 2) AS M_weight
 FROM S;
 
+-- total_score
+WITH S AS (
+SELECT
+	(SELECT SUM(R_contributing_effect) FROM r_vw) AS total_R_contribution,
+	(SELECT SUM(F_contributing_effect) FROM f_vw) AS total_F_contribution,
+	(SELECT SUM(M_contributing_effect) FROM m_vw) AS total_M_contribution),
+S2 AS
+(
+SELECT ROUND(total_R_contribution / (total_R_contribution + total_F_contribution + total_M_contribution), 2) AS R_weight,
+			 ROUND(total_F_contribution / (total_R_contribution + total_F_contribution + total_M_contribution), 2) AS F_weight,
+			 ROUND(total_M_contribution / (total_R_contribution + total_F_contribution + total_M_contribution), 2) AS M_weight
+FROM S)
+SELECT ROUND((S2.R_weight*R_score + S2.F_weight*F_score + S2.M_weight*M_score)/4100, 2) AS total_score,
+       R_score, F_score, M_score,
+       count(*) AS count,
+       count(*) / SUM(count(*)) OVER() AS ratio
 
+FROM rfm_vw,S2
+GROUP BY total_score, R_score, F_score, M_score
+ORDER BY total_score desc, R_score desc, F_score desc, M_score desc;
 
 

@@ -301,24 +301,35 @@ SELECT ROUND(total_R_contribution / (total_R_contribution + total_F_contribution
 FROM S;
 
 -- total_score
-WITH S AS (
+select *,
+     round(r_score*0.22 + f_score*0.55 + m_score*0.23, 2) as total_score
+from rfm_vw;
+
+-- rfm 고객 등급 분류
+--  매출기여 비율로 등급 구간 분류
+select distinct total_rnk , max(total_score) over(partition by total_rnk) as total_score
+from (
+select *, 
+		round(r_score*0.22 + f_score*0.55 + m_score*0.23, 2) as total_score,
+        round(percent_rank() over(order by round(r_score*0.22 + f_score*0.55 + m_score*0.23, 2)), 2) as total_rnk
+from rfm_vw) s;
+
 SELECT
-	(SELECT SUM(R_contributing_effect) FROM r_vw) AS total_R_contribution,
-	(SELECT SUM(F_contributing_effect) FROM f_vw) AS total_F_contribution,
-	(SELECT SUM(M_contributing_effect) FROM m_vw) AS total_M_contribution),
-S2 AS
-(
-SELECT ROUND(total_R_contribution / (total_R_contribution + total_F_contribution + total_M_contribution), 2) AS R_weight,
-			 ROUND(total_F_contribution / (total_R_contribution + total_F_contribution + total_M_contribution), 2) AS F_weight,
-			 ROUND(total_M_contribution / (total_R_contribution + total_F_contribution + total_M_contribution), 2) AS M_weight
-FROM S)
-SELECT ROUND((S2.R_weight*R_score + S2.F_weight*F_score + S2.M_weight*M_score)/4100, 2) AS total_score,
-       R_score, F_score, M_score,
-       count(*) AS count,
-       count(*) / SUM(count(*)) OVER() AS ratio
-
-FROM rfm_vw,S2
-GROUP BY total_score, R_score, F_score, M_score
-ORDER BY total_score desc, R_score desc, F_score desc, M_score desc;
-
+    CASE 
+        WHEN total_score <= 1.67 THEN 'WHITE'
+        WHEN total_score <= 1.9 THEN 'BLUE'
+        WHEN total_score <= 2.13 THEN 'RED'
+        ELSE 'BLACK'
+    END AS grade,
+    COUNT(*) AS count,
+    COUNT(*) / SUM(COUNT(*)) OVER() AS portion,
+    ROUND(AVG(total_score), 2) AS avg_score
+FROM (
+    SELECT
+        *,
+        ROUND(r_score * 0.22 + f_score * 0.55 + m_score * 0.23, 2) AS total_score
+    FROM rfm_vw
+) AS s
+GROUP BY grade
+ORDER BY 2;
 

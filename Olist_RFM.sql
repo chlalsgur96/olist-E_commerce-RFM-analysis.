@@ -179,8 +179,8 @@ CREATE VIEW RFM_vw AS
 WITH RFM_base AS (
     SELECT 
         customer_unique_id,
-        MAX(order_purchase_timestamp) AS R,
-        TIMESTAMPDIFF(DAY, MAX(order_purchase_timestamp), '2018-09-03') AS R_days,
+        MAX(order_purchase_timestamp) AS R_date,
+        TIMESTAMPDIFF(DAY, MAX(order_purchase_timestamp), '2018-09-03') AS R,
         COUNT(DISTINCT o.order_id) AS F,
         SUM(payment_value) AS M
     FROM orders o
@@ -192,13 +192,12 @@ WITH RFM_base AS (
 SELECT 
     customer_unique_id,
     R,
-    R_days,
     F,
     M,
     CASE 
-        WHEN R_days < 120 THEN '4'
-        WHEN R_days < 240 THEN '3'
-        WHEN R_days < 360 THEN '2'
+        WHEN R < 120 THEN '4'
+        WHEN R < 240 THEN '3'
+        WHEN R < 360 THEN '2'
         ELSE '1'
     END AS R_score,
     CASE 
@@ -211,7 +210,7 @@ SELECT
         WHEN M < 65 THEN '1'
         WHEN M < 65 * 2 THEN '2'
         WHEN M < 65 * 3 THEN '3'
-        ELSE ''
+        ELSE '4'
     END AS M_score
 FROM RFM_base;
 

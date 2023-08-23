@@ -16,13 +16,12 @@ LIMIT 10;
 
 -- orders_EDA
 -- order_status가'canceled','unavailable' 인 상태에서 수령한 경우
-select c.customer_unique_id,o.order_purchase_timestamp,o.order_delivered_customer_date
-from orders o
-join customers c on o.customer_id = c.customer_id
-where order_status in ('canceled','unavailable')
-group by order_purchase_timestamp,order_delivered_customer_date,customer_unique_id
-order by order_delivered_customer_date desc
-limit 10;
+SELECT c.customer_unique_id,o.order_purchase_timestamp,o.order_delivered_customer_date
+FROM orders o
+INNER JOIN customers c ON o.customer_id = c.customer_id
+WHERE order_status IN ('canceled','unavailable')
+ORDER BY order_delivered_customer_date DESC
+LIMIT 10;
 
 -- 구매 승인이 지난 후 주문 취소
 SELECT 
@@ -75,8 +74,8 @@ FROM (
 order by sales_count desc
 limit 10;
 
--- 매출에 따른 카테고리 제품 상위 10 / 하위 10
--- 2016~2018 까지의 상위 10
+-- 판매량에 따른 카테고리 제품 상위 10 / 하위 10
+--  상위 10
 SELECT t1.product_category_name_english,
        COUNT(DISTINCT t1.order_id) as Order_cnt,
        ROUND(SUM(t1.payment_value),2) as Revenue
@@ -94,46 +93,54 @@ GROUP BY t1.product_category_name_english
 ORDER BY Revenue DESC
 LIMIT 10;
 
--- 2016~2018 까지의 하위 10
-SELECT t1.product_category_name_english,
+--  하위 10
+SELECT t1.product_category_name,
        COUNT(DISTINCT t1.order_id) as Order_cnt,
        ROUND(SUM(t1.payment_value),2) as Revenue
 FROM (
-    SELECT p.product_category_name_english, oi.order_id, op.payment_value, o.order_status, o.order_delivered_customer_date
-    FROM products_new p
+    SELECT p.product_category_name, oi.order_id, op.payment_value, o.order_status, o.order_delivered_customer_date
+    FROM products p
     LEFT JOIN order_items oi ON p.product_id = oi.product_id
     LEFT JOIN orders o ON oi.order_id = o.order_id
     LEFT JOIN order_payments op ON oi.order_id = op.order_id
 ) t1
-WHERE t1.product_category_name_english IS NOT NULL
+WHERE t1.product_category_name IS NOT NULL
       AND t1.order_status not in ('canceled', 'unavailable')
       AND t1.order_delivered_customer_date IS NOT NULL
-GROUP BY t1.product_category_name_english
-ORDER BY Revenue ASC
+GROUP BY t1.product_category_name
+ORDER BY Revenue 
 LIMIT 10;
 
+
+
 -- order_reviews_EDA
--- review_score 기 5인 주문건수와 비율
-SELECT yearmonth, r_score, all_cnt,
-       ROUND(r_score * 100.0 / all_cnt, 2) AS percentage
- FROM (
-     SELECT DATE_FORMAT(order_reviews.review_answer_timestamp, '%Y-%m') AS yearmonth,
-            SUM(CASE WHEN order_reviews.review_score = 5 THEN 1 ELSE 0 END) AS r_score,
-            COUNT(DISTINCT order_reviews.order_id) AS all_cnt
-     FROM order_reviews
-     LEFT JOIN orders ON order_reviews.order_id = orders.order_id
-     WHERE orders.order_status = 'delivered'
-       AND YEAR(order_reviews.review_answer_timestamp) BETWEEN 2016 AND 2018
-     GROUP BY yearmonth
- ) AS subquery
- ORDER BY yearmonth DESC
- limit 10;
+-- review_score가 5인 주문건수와 비율
+-- 2018년 기준
+ELECT 
+  YearMonth, 
+  SUM(CASE WHEN r.review_score >= 5 THEN 1 ELSE 0 END) AS review_scores5,
+  COUNT(DISTINCT r.order_id) AS order_cnt,
+  ROUND(SUM(CASE WHEN r.review_score >= 5 THEN 1 ELSE 0 END) / COUNT(DISTINCT r.order_id) * 100, 2) AS percentage
+FROM (
+  SELECT 
+    DATE_FORMAT(r.review_answer_timestamp, '%y-%m') AS YearMonth,
+    r.review_score,
+    r.order_id
+  FROM order_reviews AS r
+    INNER JOIN orders o ON r.order_id = o.order_id
+  WHERE o.order_status NOT IN ('canceled', 'unavailable')
+    AND YEAR(r.review_answer_timestamp) = '2018'
+) AS r
+GROUP BY YearMonth
+ORDER BY 1
+LIMIT 12;
 
 -- 카테고리 제품 성장률
-WITH Category_revenue AS (
+ WITH Category_growth AS (
     SELECT
-        p.product_category_name_english AS cat_name,
+        p.product_category_name AS cat_name,
         op.payment_value,
+        o.order_id,
         CASE
             WHEN DATE_FORMAT(o.order_purchase_timestamp, '%Y') = '2017' THEN '2017'
             WHEN DATE_FORMAT(o.order_purchase_timestamp, '%Y') = '2018' THEN '2018'
@@ -141,24 +148,24 @@ WITH Category_revenue AS (
     FROM order_payments op
     LEFT JOIN orders o ON op.order_id = o.order_id
     LEFT JOIN order_items oi ON op.order_id = oi.order_id
-    LEFT JOIN products_new p ON oi.product_id = p.product_id
+    LEFT JOIN products p ON oi.product_id = p.product_id
     WHERE o.order_status NOT IN ('canceled', 'unavailable')
         AND (DATE_FORMAT(o.order_purchase_timestamp, '%Y') = '2017'
                OR DATE_FORMAT(o.order_purchase_timestamp, '%Y') = '2018')
-    GROUP BY p.product_category_name_english, op.payment_value, purchase_fiscal
-)
-
+    GROUP BY p.product_category_name, op.payment_value, purchase_fiscal, o.order_id
+) 
 SELECT cat_name,
-       SUM(CASE WHEN purchase_fiscal = '2017' THEN payment_value END) AS '2017',
-       SUM(CASE WHEN purchase_fiscal = '2018' THEN payment_value END) AS '2018',
+       COUNT(CASE WHEN purchase_fiscal = '2017' THEN order_id END) AS '2017_cnt',
+       COUNT(CASE WHEN purchase_fiscal = '2018' THEN order_id END) AS '2018_cnt',
+       COUNT(order_id) AS All_cnt,
+       SUM(CASE WHEN purchase_fiscal = '2017' THEN payment_value END) AS '2017_payment',
+       SUM(CASE WHEN purchase_fiscal = '2018' THEN payment_value END) AS '2018_payment',
        ROUND((SUM(CASE WHEN purchase_fiscal = '2018' THEN payment_value END) 
-             / SUM(CASE WHEN purchase_fiscal = '2017' THEN payment_value END) - 1) * 100, 2) AS "growth_rate(%)"
-FROM Category_revenue
+             / SUM(CASE WHEN purchase_fiscal = '2017' THEN payment_value END) - 1) * 100, 2) AS "payment_growth_rate(%)",
+       ROUND((COUNT(CASE WHEN purchase_fiscal = '2018' THEN order_id END) 
+             / COUNT(CASE WHEN purchase_fiscal = '2017' THEN order_id END) - 1) * 100, 2) AS "order_count_growth_rate(%)"
+FROM Category_growth
 GROUP BY cat_name
-ORDER BY
-    CASE
-        WHEN cat_name = 'product_category_name_for_2017' THEN 1
-        WHEN cat_name = 'product_category_name_for_2018' THEN 2
-        ELSE 3
-        END,
-    "growth_rate(%)" desc;
+ORDER BY 
+    All_cnt 
+LIMIT 10;

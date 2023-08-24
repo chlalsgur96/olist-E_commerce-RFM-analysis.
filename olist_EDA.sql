@@ -15,35 +15,25 @@ ORDER BY order_count DESC
 LIMIT 10;
 
 -- orders_EDA
--- order_status가'canceled','unavailable' 인 상태에서 수령한 경우
-SELECT c.customer_unique_id,o.order_purchase_timestamp,o.order_delivered_customer_date
-FROM orders o
-INNER JOIN customers c ON o.customer_id = c.customer_id
-WHERE order_status IN ('canceled','unavailable')
-ORDER BY order_delivered_customer_date DESC
-LIMIT 10;
-
--- 구매 승인이 지난 후 주문 취소
-SELECT 
-    c.customer_unique_id,
-    o.order_approved_at,
-    o.order_status,
-    COUNT(*) AS canceled_order_count
-FROM customers c
-JOIN orders o ON c.customer_id = o.customer_id
-WHERE o.order_status = 'canceled' AND o.order_approved_at is not null
-GROUP BY c.customer_unique_id, o.order_approved_at, o.order_status
-ORDER BY canceled_order_count DESC;
 
 -- 연도별 / 월별 주문수를 추출(단. order_status 가 canceled , unavailable 인 상태는 제외.)
-select date_format(order_purchase_timestamp,'%m') as month,
-	count(if(year(order_purchase_timestamp) = '2016' , order_id,null)) as '2016',
-    count(if(year(order_purchase_timestamp) = '2017' , order_id,null)) as '2017',
-    count(if(year(order_purchase_timestamp) = '2018' , order_id,null)) as '2018'
-from orders
-where order_status not in('canceled','unavailable')
-group by month
-order by month;
+SELECT
+    month,
+    SUM(CASE WHEN year = '2016' THEN order_count ELSE 0 END) AS '2016',
+    SUM(CASE WHEN year = '2017' THEN order_count ELSE 0 END) AS '2017',
+    SUM(CASE WHEN year = '2018' THEN order_count ELSE 0 END) AS '2018',
+    ROUND((SUM(CASE WHEN year = '2018' THEN order_count ELSE 0 END) / SUM(CASE WHEN year = '2017' THEN order_count ELSE 0 END)) * 100, 2) AS '2017_vs2018(%)'
+FROM (
+    SELECT
+        DATE_FORMAT(order_purchase_timestamp, '%m') AS month,
+        YEAR(order_purchase_timestamp) AS year,
+        COUNT(order_id) AS order_count
+    FROM orders
+    WHERE order_status NOT IN ('canceled', 'unavailable')
+    GROUP BY month, year
+) AS s1
+GROUP BY month
+ORDER BY month;
 
 -- products_EDA
 -- 제품 카테고리별 매출액 

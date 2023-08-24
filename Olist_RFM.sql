@@ -72,43 +72,6 @@ FROM (
 	ORDER BY     F
 ;
 
- R: 고객 별 최근 구매 활동
-SELECT
-    c.customer_unique_id,
-    MAX(o.order_purchase_timestamp) AS last_purchase_date,
-    DATEDIFF('2018-09-03', MAX(o.order_purchase_timestamp)) AS recency,
-    RANK() OVER(ORDER BY DATEDIFF('2018-09-03', MAX(o.order_purchase_timestamp))) AS recency_rank
-FROM
-    customers c
-JOIN
-    orders o ON c.customer_id = o.customer_id
-WHERE
-    o.order_status NOT IN ('canceled', 'unavailable')
-GROUP BY
-    c.customer_unique_id
-ORDER BY
-    recency_rank;
-
--- R 분포
-SELECT
-    recency_rank AS R_group,
-    COUNT(*) AS count,
-    COUNT(*) / SUM(COUNT(*)) OVER() AS portion
-FROM (
-    SELECT
-        RANK() OVER(ORDER BY DATEDIFF('2018-09-03', MAX(o.order_purchase_timestamp))) AS recency_rank
-    FROM
-        customers c
-    JOIN
-        orders o ON c.customer_id = o.customer_id
-    WHERE
-        o.order_status NOT IN ('canceled', 'unavailable')
-    GROUP BY
-        c.customer_unique_id
-) AS R_data
-GROUP BY recency_rank
-ORDER BY recency_rank;
-
 -- F : 고객 구매 빈도
 SELECT
     c.customer_unique_id,

@@ -38,6 +38,16 @@ rfm_df = df[['R','F','M']]
 # 결과 확인
 rfm_df.head()
 
+# RFM 지표 분포 시각화
+fig, axes = plt.subplots(1,3, figsize=(15,4))
+
+axes = axes.flatten()
+
+for col, ax in zip(['R','F','M'],axes):
+    sns.distplot(rfm_df[col],ax=ax)
+
+plt.show()
+
 
 
 

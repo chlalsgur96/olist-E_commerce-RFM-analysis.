@@ -1,0 +1,43 @@
+# 데이터 불러오기
+# SQL에서 python
+from sqlalchemy import create_engine
+import pymysql
+
+db_user = 'root'
+db_password = 'User_Password'
+db_host = 'localhost'
+db_port = '3306'
+db_name = 'olist'
+db_charset = 'utf8mb4'
+
+# MySQL 연결 URL 생성
+db_url = f'mysql+pymysql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}?charset={db_charset}'
+
+engine = create_engine(db_url, echo=True)
+
+query = """
+         SELECT customer_unique_id, 
+			MAX(order_purchase_timestamp) AS R,
+			COUNT(DISTINCT o.order_id) AS F,
+			ROUND(SUM(payment_value),2) AS M
+	FROM   orders o
+	LEFT JOIN   order_payments op
+	ON    o.order_id = op.order_id
+	LEFT JOIN   customers c
+	ON     o.customer_id = c.customer_id
+	WHERE  order_status not in('canceled', 'unavailable') 
+	AND payment_type is not null
+	GROUP BY     customer_unique_id
+	ORDER BY     M ;
+        """
+
+# 쿼리 실행 결과를 DataFrame으로 읽기
+df = pd.read_sql_query(query, engine)
+rfm_df = df[['R','F','M']]
+
+# 결과 확인
+rfm_df.head()
+
+
+
+

@@ -66,21 +66,21 @@ limit 10;
 
 -- 판매량에 따른 카테고리 제품 상위 10 / 하위 10
 --  상위 10
-SELECT t1.product_category_name_english,
+SELECT t1.product_category_name,
        COUNT(DISTINCT t1.order_id) as Order_cnt,
        ROUND(SUM(t1.payment_value),2) as Revenue
 FROM (
-    SELECT p.product_category_name_english, oi.order_id, op.payment_value, o.order_status, o.order_delivered_customer_date
-    FROM products_new p
+    SELECT p.product_category_name, oi.order_id, op.payment_value, o.order_status, o.order_delivered_customer_date
+    FROM products p
     LEFT JOIN order_items oi ON p.product_id = oi.product_id
     LEFT JOIN orders o ON oi.order_id = o.order_id
     LEFT JOIN order_payments op ON oi.order_id = op.order_id
 ) t1
-WHERE t1.product_category_name_english IS NOT NULL
+WHERE t1.product_category_name IS NOT NULL
       AND t1.order_status not in ('canceled', 'unavailable')
       AND t1.order_delivered_customer_date IS NOT NULL
-GROUP BY t1.product_category_name_english
-ORDER BY Revenue DESC
+GROUP BY t1.product_category_name
+ORDER BY Revenue  DESC
 LIMIT 10;
 
 --  하위 10
@@ -104,16 +104,52 @@ LIMIT 10;
 
 
 -- order_reviews_EDA
--- review_score가 5인 주문건수와 비율
+-- review_score 별  주문건수와 비율
 -- 2018년 기준
-ELECT 
+SELECT 
   YearMonth, 
-  SUM(CASE WHEN r.review_score >= 5 THEN 1 ELSE 0 END) AS review_scores5,
-  COUNT(DISTINCT r.order_id) AS order_cnt,
-  ROUND(SUM(CASE WHEN r.review_score >= 5 THEN 1 ELSE 0 END) / COUNT(DISTINCT r.order_id) * 100, 2) AS percentage
+  SUM(CASE WHEN r.review_score = 1 THEN 1 ELSE 0 END) AS review_scores1,
+  ROUND(SUM(CASE WHEN r.review_score = 1 THEN 1 ELSE 0 END) / COUNT(DISTINCT r.order_id) * 100, 2) AS 'review_1_percentage(%)',
+  SUM(CASE WHEN r.review_score = 2 THEN 1 ELSE 0 END) AS review_scores2,
+  ROUND(SUM(CASE WHEN r.review_score = 2 THEN 1 ELSE 0 END) / COUNT(DISTINCT r.order_id) * 100, 2) AS 'review_2_percentage(%)',
+  SUM(CASE WHEN r.review_score = 3 THEN 3 ELSE 0 END) AS review_scores3,
+  ROUND(SUM(CASE WHEN r.review_score = 4 THEN 1 ELSE 0 END) / COUNT(DISTINCT r.order_id) * 100, 2) AS'review_3_percentage(%)',
+  SUM(CASE WHEN r.review_score = 4 THEN 1 ELSE 0 END) AS review_scores4,
+  ROUND(SUM(CASE WHEN r.review_score = 4 THEN 1 ELSE 0 END) / COUNT(DISTINCT r.order_id) * 100, 2) AS 'review_4_percentage(%)',
+  SUM(CASE WHEN r.review_score = 5 THEN 1 ELSE 0 END) AS review_scores5,
+  ROUND(SUM(CASE WHEN r.review_score = 5 THEN 1 ELSE 0 END) / COUNT(DISTINCT r.order_id) * 100, 2) AS 'review_5_percentage(%)',
+  COUNT(DISTINCT r.order_id) AS ALL_ORD_CNT
 FROM (
   SELECT 
     DATE_FORMAT(r.review_answer_timestamp, '%y-%m') AS YearMonth,
+    r.review_score,
+    r.order_id
+  FROM order_reviews AS r
+    INNER JOIN orders o ON r.order_id = o.order_id
+  WHERE o.order_status NOT IN ('canceled', 'unavailable')
+    AND YEAR(r.review_answer_timestamp) = '2018'
+) AS r
+GROUP BY YearMonth
+ORDER BY 1
+LIMIT 12;
+
+-- 월별 기준 
+SELECT 
+  YearMonth, 
+  SUM(CASE WHEN r.review_score = 1 THEN 1 ELSE 0 END) AS review_scores1,
+  ROUND(SUM(CASE WHEN r.review_score = 1 THEN 1 ELSE 0 END) / COUNT(DISTINCT r.order_id) * 100, 2) AS 'review_2_percentage(%)',
+  SUM(CASE WHEN r.review_score = 2 THEN 1 ELSE 0 END) AS review_scores2,
+  ROUND(SUM(CASE WHEN r.review_score = 2 THEN 1 ELSE 0 END) / COUNT(DISTINCT r.order_id) * 100, 2) AS 'review_2_percentage(%)',
+  SUM(CASE WHEN r.review_score = 3 THEN 1 ELSE 0 END) AS review_scores3,
+  ROUND(SUM(CASE WHEN r.review_score = 3 THEN 1 ELSE 0 END) / COUNT(DISTINCT r.order_id) * 100, 2) AS 'review_3_percentage(%)',
+  SUM(CASE WHEN r.review_score = 4 THEN 1 ELSE 0 END) AS review_scores4,
+  ROUND(SUM(CASE WHEN r.review_score = 4 THEN 1 ELSE 0 END) / COUNT(DISTINCT r.order_id) * 100, 2) AS 'review_4_percentage(%)',
+  SUM(CASE WHEN r.review_score = 5 THEN 1 ELSE 0 END) AS review_scores5,
+  ROUND(SUM(CASE WHEN r.review_score = 5 THEN 1 ELSE 0 END) / COUNT(DISTINCT r.order_id) * 100, 2) AS 'review_5_percentage(%)',
+  COUNT(DISTINCT r.order_id) AS ALL_ORD_CNT
+FROM (
+  SELECT 
+    DATE_FORMAT(r.review_answer_timestamp, '%Y') AS YearMonth,
     r.review_score,
     r.order_id
   FROM order_reviews AS r

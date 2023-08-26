@@ -49,6 +49,16 @@ for col, ax in zip(['R','F','M'],axes):
 plt.show()
 
 
+# 사분위수 측정
+percentile = [0.25,0.5,0.75]
+rfm_df.R.describe(percentile)
+rfm_df.F.describe(percentile)
+rfm_df.M.describe(percentile)
+
+
+
+
+
 
 
 

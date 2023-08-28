@@ -37,29 +37,29 @@ ORDER BY month;
 
 -- products_EDA
 -- 제품 카테고리별 매출액 
-SELECT p.product_category_name_english,
+SELECT p.product_category_name,
 	round(SUM(payment_value),2)as revenue
-FROM products_new p
+FROM products p
 JOIN order_items oi ON p.product_id = oi.product_id
 JOIN orders o ON oi.order_id = o.order_id
 JOIN order_payments op ON oi.order_id = op.order_id
 WHERE order_status not in ('canceled','unavailable')
 AND order_delivered_customer_date IS NOT NULL
-GROUP BY p.product_category_name_english
+GROUP BY p.product_category_name
 ORDER BY revenue DESC
 limit 10;
 
 -- 제품 카테고리별 판매 개수 계산
-SELECT product_category_name_english, sales_count,
+SELECT product_category_name, sales_count,
        ROUND(sales_count / total_sales * 100, 3) AS sales_ratio
 FROM (
-    SELECT p.product_category_name_english, COUNT(*) AS sales_count,
+    SELECT p.product_category_name, COUNT(*) AS sales_count,
            SUM(COUNT(*)) OVER () AS total_sales 
     FROM order_items oi
-    JOIN products_new p ON oi.product_id = p.product_id
+    JOIN products p ON oi.product_id = p.product_id
     JOIN orders o ON oi.order_id = o.order_id
     WHERE o.order_status not in ('cancled','unavailable')
-    GROUP BY p.product_category_name_english
+    GROUP BY p.product_category_name
 ) AS category_sales
 order by sales_count desc
 limit 10;
